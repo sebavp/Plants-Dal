@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*
-
+from plants_libs.timeit import timeit
 
 class Plant(object):
     def __init__(self, plant=None):
@@ -33,7 +33,7 @@ class Plant(object):
             plants.append(Plant._db_to_plant(plant))
         return plants
 
-
+    @timeit
     @staticmethod
     def search(db, descriptors):
         db.execute('''SELECT name, common_name, photo, wiki, descriptors, vdistance(descriptors ,cast(%s as double precision[])) as distance

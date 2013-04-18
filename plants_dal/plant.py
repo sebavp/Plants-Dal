@@ -12,13 +12,19 @@ class Plant(object):
             self.distance = plant.get('distance',0)
 
     def save(self, db):
-        db.execute("INSERT INTO leaves(name,common_name,photo,wiki, descriptors) values (%(name)s,%(common_name)s,%(photo)s,%(wiki)s,%(descriptors)s);",
-        {'name':self.name,'common_name':self.common_name, 'photo':self.photo,'wiki':self.wiki,'descriptors':self.descriptors})
+        db.execute("INSERT INTO leaves(name,common_name,photo,wiki) values (%(name)s,%(common_name)s,%(photo)s,%(wiki)s);",
+        {'name':self.name,'common_name':self.common_name, 'photo':self.photo,'wiki':self.wiki})
+        Plant.add_sample(db, self.name, self.descriptors)
+
+    @staticmethod
+    def add_sample(db, name, descriptors):
+        db.execute("INSERT INTO descriptors(name, descriptors) values (%(name)s,%(descriptors)s);",
+                    {'name':name,'descriptors':descriptors})
 
     @staticmethod
     def _db_to_plant(plant_result):
         if plant_result:
-            plant = {'name':plant_result[0], 'common_name': plant_result[1],'photo':plant_result[2],'wiki':plant_result[3],'descriptors':plant_result[4]}
+            plant = {'name':plant_result[0], }
             if len(plant_result)>5:
                 plant['distance'] = plant_result[5]
             return plant
@@ -27,19 +33,21 @@ class Plant(object):
 
     @staticmethod
     def retrieve(db, name):
-        db.execute("SELECT name,common_name,photo,wiki,descriptors FROM Leaves WHERE name=%s LIMIT 1",(name,))
+        db.execute("SELECT name,common_name,photo,wiki FROM Leaves WHERE name=%s LIMIT 1",(name,))
         plants = []
         for plant in db.fetchall():
             plants.append(Plant._db_to_plant(plant))
         return plants
 
-    @timeit
     @staticmethod
+    @timeit
     def search(db, descriptors):
-        db.execute('''SELECT name, common_name, photo, wiki, descriptors, vdistance(descriptors ,cast(%s as double precision[])) as distance
-                      FROM Leaves
-                      ORDER BY distance ASC
-                      LIMIT 2''', (descriptors,))
+        db.execute('''SELECT distinct Leaves.name as name 
+                      FROM Leaves, (SELECT name, vdistance(descriptors ,cast(%s as double precision[])) as distance
+                                    FROM descriptors
+                                    ORDER BY distance ASC
+                                    LIMIT 10) as descr
+                      WHERE Leaves.name = descr.name;''', (descriptors,))
         plants = []
         for plant in db.fetchall():
             plants.append(Plant._db_to_plant(plant))
